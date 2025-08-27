@@ -1,32 +1,38 @@
-import fetch from "node-fetch";
+import OpenAI from "openai";
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
   const { title, keywords, platform } = req.body;
-  if (!title || !keywords) return res.status(400).json({ error: "Missing fields" });
+
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ error: "Missing OpenAI API key." });
+  }
+
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   try {
-    const prompt = `Generate SEO tags, hashtags, and description for a ${platform} video.
-    Title: ${title}
-    Keywords: ${keywords}`;
-
-    const apiRes = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + process.env.GEMINI_API_KEY, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a helpful SEO assistant." },
+        { role: "user", content: `Generate SEO tags, hashtags, and a description for:
+        Title: ${title}
+        Keywords: ${keywords}
+        Platform: ${platform}` }
+      ]
     });
 
-    const data = await apiRes.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const text = completion.choices[0].message.content;
 
     res.status(200).json({
-      tags: text.split("\n").filter(l => l.startsWith("Tags:"))[0] || "",
-      hashtags: text.split("\n").filter(l => l.startsWith("Hashtags:"))[0] || "",
+      tags: keywords.split(",").map(k => k.trim()).join(", "),
+      hashtags: "#" + keywords.split(",").map(k => k.trim().replace(/\s+/g, "")).join(" #"),
       description: text
     });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Failed to fetch from Gemini API" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 }

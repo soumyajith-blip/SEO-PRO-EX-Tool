@@ -1,8 +1,9 @@
 {
-  "name": "seo-pro",
+  "name": "seo-pro-vercel",
   "version": "1.0.0",
+  "main": "index.html",
   "type": "module",
   "dependencies": {
-    "node-fetch": "^3.3.2"
+    "openai": "^4.0.0"
   }
 }
